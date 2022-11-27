@@ -1,0 +1,84 @@
+# Дано множество слов, необходимо:
+# Предобработать его;
+# Уметь быстро отвечать на запросы «дай мне все анаграммы к заданной строке из словаря».
+# Анаграммы это слова, которые получаются друг из друга перестановкой букв, например (BABA и ABBA анаграммы, а ABA и ABBA -- нет)
+# Например, если пришел запрос "ABBA", надо вернуть все анаграммы этого запроса, которые есть у нас в словаре.
+from collection import counter
+dict_words = {}
+list_words = ['abb', 'bba', 'aaa', 'aba']
+for i in range(len(list_words)):
+    key = ''.join(sorted(list_words[i]))
+    if key not in dict_words: dict_words[key] = []
+    dict_words[key].append(list_words[i])
+
+def find_anagramm(word):
+
+    if len(word)==0: return None
+    sort_word = ''.join(sorted(word))
+    
+    
+    if sort_word in dict_words:
+        return dict_words[sort_word]
+    else: return []
+
+---------------
+CREATE TABLE shops (
+  id bigint(20) NOT NULL AUTO_INCREMENT,
+  created datetime NOT NULL,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE orders (
+  id bigint(20) NOT NULL AUTO_INCREMENT,
+  shop_id bigint(20) NOT NULL,
+  source VARCHAR(255) DEFAULT 'cabinet', -- another possible value - 'api'
+  created datetime NOT NULL,
+  PRIMARY KEY (id)
+);
+
+-- Напишите SQL запрос на выборку количества магазинов, у которых был хотя бы один заказ в месяц, 
+-- по месяцам, начиная с мая 2014.
+select  MONTH(o.datetime) as month, count(distinct o.shop_id) as counts_shops
+from shops s
+join orders o on s.id = o.shop_id
+group by month
+having count(o.id)>=1
+
+-- Напишите SQL запрос на выборку количества магазинов, у которых был хотя бы пять заказов в месяц, 
+-- по месяцам, начиная с мая 2014.
+select more5orders.month, count(distinct more5orders.shop)
+from
+(
+select MONTH(o.created) as month, s.id as shop, count(o.id) as counts_orders
+from shops s
+join orders o on s.id = o.shop_id
+group by month, shop
+having counts_orders >=5) more5orders
+group by month
+
+-- Напишите SQL запрос на выборку количества магазинов, у которых были хотя бы пять заказов в месяц, и заказы преимущественно через  API. (более 50 %)
+-- по месяцам, начиная с мая 2014.
+
+with more5orders as (
+    select MONTH(o.created) as month, s.id as shop, count(o.id) as counts_orders
+    from shops s
+    join orders o on s.id = o.shop_id
+    group by month, shop
+    having counts_orders >=5)
+
+with topAPIorders as(
+    select MONTH(o.created) as month, s.id as shop, countIf(distinct o.id, o.source = 'api') / count(distinct o.id) share_api_orders
+    from shops s
+    join orders o on s.id = o.shop_id
+    group by month, shop
+    having share_api_orders >=0.5
+)
+
+select month , count(distinct shop) as count_shops
+from
+    (select month, shop
+    from more5orders
+    intersect
+    select month, shop
+    from topAPIorders) more5_topapi_ord
+group by month
